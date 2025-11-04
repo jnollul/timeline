@@ -1,12 +1,12 @@
-// ...existing code...
+# ...existing code...
 #!/usr/bin/env Rscript
 # Convert CSV of date ranges into a months x days (1..31) grid of 0/1
-# Usage: Rscript convert_ranges_to_grid.R input.csv output.csv [start_col end_col date_format]
+# Usage: Rscript calendar.R input.csv output.csv [start_col end_col date_format]
 # Defaults: start_col="Out", end_col="Return", accepts common date formats (DD/MM/YYYY, YYYY-MM-DD, etc.)
 
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) < 2) {
-  stop("Usage: Rscript convert_ranges_to_grid.R input.csv output.csv [start_col end_col date_format]")
+  stop("Usage: Rscript calendar.R input.csv output.csv [start_col end_col date_format]")
 }
 infile <- args[1]
 outfile <- args[2]
@@ -21,40 +21,33 @@ if (!(start_col %in% names(df) && end_col %in% names(df))) {
 }
 
 parse_dates_vec <- function(x, fmt = "") {
-  # Try provided format first, then common formats. Non-parseable -> NA (keeps rows with NO OUTBOUND)
   parse_with <- function(vec, f) {
     res <- as.Date(vec, format = f)
     res
   }
   if (fmt != "") {
     res <- parse_with(x, fmt)
-    # if some parsed and some not, still keep NAs
     return(res)
   }
   formats <- c("%d/%m/%Y", "%Y-%m-%d", "%Y/%m/%d", "%m/%d/%Y", "%d-%m-%Y")
   for (f in formats) {
     res <- parse_with(x, f)
-    # if at least one non-NA parsed, prefer this parsing for those entries; otherwise try next
     if (any(!is.na(res))) {
-      # If some entries are still NA, leave them NA
       return(res)
     }
   }
-  # final fallback: as.Date default (may yield NA)
   as.Date(x)
 }
 
 starts_all <- parse_dates_vec(df[[start_col]], date_fmt)
 ends_all   <- parse_dates_vec(df[[end_col]], date_fmt)
 
-# Keep only rows where both start and end are valid dates
 valid_idx <- which(!is.na(starts_all) & !is.na(ends_all))
 if (length(valid_idx) == 0) stop("No valid start/end date pairs found in input.")
 
 starts <- starts_all[valid_idx]
 ends   <- ends_all[valid_idx]
 
-# Ensure start <= end for each pair; if not, swap
 swap_idx <- which(starts > ends)
 if (length(swap_idx) > 0) {
   tmp <- starts[swap_idx]
@@ -75,7 +68,6 @@ grid <- matrix(0L, nrow = n_months, ncol = length(days))
 colnames(grid) <- sprintf("%02d", days)
 row_names <- format(months_seq, "%Y-%m")
 
-# For each month/day, build the date; if valid and falls into any range mark 1
 for (i in seq_along(months_seq)) {
   m <- months_seq[i]
   yr <- as.integer(format(m, "%Y"))
@@ -83,7 +75,6 @@ for (i in seq_along(months_seq)) {
   for (d in days) {
     dt <- tryCatch(as.Date(sprintf("%04d-%02d-%02d", yr, mo, d), format = "%Y-%m-%d"), error = function(e) NA)
     if (!is.na(dt)) {
-      # check if date is within any of the ranges
       if (any(dt >= starts & dt <= ends, na.rm = TRUE)) grid[i, d] <- 1L
     }
   }
@@ -94,4 +85,4 @@ out_df <- cbind(out_df, as.data.frame(grid, stringsAsFactors = FALSE))
 
 write.csv(out_df, file = outfile, row.names = FALSE, quote = FALSE)
 cat(sprintf("Wrote grid to %s (months: %d, days: 1..31)\n", outfile, n_months))
-// ...existing code...
+# ...existing code...
